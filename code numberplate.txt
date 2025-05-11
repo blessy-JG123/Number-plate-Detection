@@ -1,0 +1,53 @@
+from google.colab import drive
+drive.mount('/content/drive')
+
+import os
+import cv2
+import easyocr
+import numpy as np
+import matplotlib.pyplot as plt
+from google.colab.patches import cv2_imshow
+
+reader = easyocr.Reader(['en'])
+
+# Correct local path to the dataset in Google Drive
+dataset_path = '/content/drive/MyDrive/Indian_Number_Plates/Sample_Images'
+
+def detect_number_plate(image_path):
+    img = cv2.imread(image_path)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
+
+    plate_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_russian_plate_number.xml')
+    plates = plate_cascade.detectMultiScale(thresh, scaleFactor=1.1, minNeighbors=5)
+
+    number_plate_texts = []
+
+    for (x, y, w, h) in plates:
+        plate_img = img[y:y+h, x:x+w]
+        result = reader.readtext(plate_img)
+        for detection in result:
+            number_plate_texts.append(detection[1])
+        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+    return img, number_plate_texts
+
+def analyze_dataset(dataset_path):
+    detected_texts = {}
+    for image_filename in os.listdir(dataset_path):
+        image_path = os.path.join(dataset_path, image_filename)
+        if image_filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            print(f"Processing {image_filename}...")
+            result_img, plate_text = detect_number_plate(image_path)
+            detected_texts[image_filename] = plate_text
+            print(f"Detected Text for {image_filename}: {plate_text}")
+            cv2_imshow(result_img)
+    return detected_texts
+
+# Run it
+detected_texts = analyze_dataset(dataset_path)
+
+print("\nAll Detected Texts:")
+for filename, texts in detected_texts.items():
+    print(f"{filename}: {texts}")
